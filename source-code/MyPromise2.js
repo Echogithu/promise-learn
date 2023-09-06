@@ -2,8 +2,46 @@ const PENDING = "PENDING",
   FULFILLED = "FULFILLED",
   REJECTED = "REJECTED";
 
-function resolvePromise(promise, x, resolve, reject) {
-  console.log("MyPromise2");
+function resolvePromise(promise2, x, resolve, reject) {
+  // 如果 promise 和 x 引用的是同一个对象，则以一个 TypeError 作为 reason 让 promise 转为 rejeted 状态。
+  if (promise2 === x) {
+    return reject(
+      new TypeError("Chaining cycle detected for promise #<MyPromise>")
+    );
+  }
+  let called = false;
+
+  // 如果 x 是一个对象或者函数。
+  if ((typeof x === "object" && x !== null) || typeof x === "function") {
+    try {
+      let then = x.then;
+      if (typeof then === "function") {
+        // then 是一个函数，才可能有成功或者失败的回调
+        // promise
+        then.call(
+          x,
+          (y) => {
+            if (called) return;
+            called = true;
+            resolvePromise(promise2, y, resolve, reject);
+          },
+          (r) => {
+            if (called) return;
+            called = true;
+            reject(r);
+          }
+        );
+      } else {
+        resolve(x);
+      }
+    } catch (e) {
+      if (called) return;
+      called = true;
+      reject(e);
+    }
+  } else {
+    resolve(x);
+  }
 }
 
 class MyPromise {
@@ -48,7 +86,18 @@ class MyPromise {
   // 必须去判断x是什么值
   // onFullFilled 和 onRejected 异步的，可以用宏任务或微任务实现异步，源码是用微任务
   then(onFullFilled, onRejected) {
-    let promise2 = new Promise((resolve, reject) => {
+    // 设置默认值
+    onFullFilled =
+      typeof onFullFilled === "function" ? onFullFilled : (value) => value;
+
+    onRejected =
+      typeof onRejected === "function"
+        ? onRejected
+        : (reason) => {
+            throw new Error(reason);
+          };
+
+    let promise2 = new MyPromise((resolve, reject) => {
       if (this.status === FULFILLED) {
         setTimeout(() => {
           try {
@@ -95,6 +144,10 @@ class MyPromise {
     });
 
     return promise2;
+  }
+
+  catch(errorCallBack) {
+    return this.then(null, errorCallBack);
   }
 }
 
